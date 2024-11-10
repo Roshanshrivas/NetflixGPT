@@ -1,24 +1,77 @@
 import React, { useRef, useState } from 'react'
 import Header from './Header'
 import { checkValidData } from '../utils/validate';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile} from "firebase/auth";
+import { auth } from '../utils/firebase';
+import {useNavigate } from 'react-router-dom';
+import { addUser } from '../utils/userSlice';
+import { useDispatch } from 'react-redux';
 
 const Login = () => {
   const [isSignInForm, setIsSignInForm] = useState(true);
   const [errorMessage, setErrorMessage] = useState(null);
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
 
   const name = useRef(null)
   const email = useRef(null);
   const password = useRef(null);
 
+  // validation the form data
   const handleButtonClick = () => {
-    // validation the form data
-    
-    console.log(name.current.value);
-    console.log(email.current.value);
-    console.log(password.current.value);
-
-    const message = checkValidData(name.current.value, email.current.value, password.current.value);
+    const message = checkValidData(email.current.value, password.current.value);
     setErrorMessage(message);
+    if(message) return;
+
+    if(!isSignInForm) {
+      // signUp logic here
+      createUserWithEmailAndPassword(
+        auth, 
+        email.current.value,
+        password.current.value,
+      )
+       .then((userCredential) => {
+         const user = userCredential.user;
+         updateProfile(user, {
+          displayName: name.current.value, 
+          photoURL: "https://icons.veryicon.com/png/o/internet--web/web-interface-flat/6606-male-user.png"
+        }).then(() => {
+          const { uid, email, displayName, photoURL } = auth.currentUser;
+          dispatch(addUser({
+            uid: uid, 
+            email: email, 
+            displayName: displayName, 
+            photoURL: photoURL}));
+
+          navigate("/browse");
+        }).catch((error) => {
+          setErrorMessage(error.message);
+        });
+         
+       })
+       .catch((error) => {
+         const errorCode = error.code;
+         const errorMessage = error.message;
+         setErrorMessage(errorCode + "-" + errorMessage)
+       });
+    } 
+    else {
+      // signIn logic here
+      signInWithEmailAndPassword(auth, email.current.value, password.current.value)
+        .then((userCredential) => {
+          // Signed in 
+          const user = userCredential.user;
+          console.log(user);
+          navigate("/browse");
+          
+        })
+        .catch((error) => {
+          const errorCode = error.code;
+          const errorMessage = error.message;
+          setErrorMessage(errorCode + "-" + errorMessage)
+        });
+
+    }
     
   }
 
